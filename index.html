@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F1 Telemetry Panel</title>
+<style>
+:root{
+  --bg:#0e1015;--panel:#161922;--panel2:#1d212c;--line:#2a2f3d;--text:#e8eaf0;--mute:#8a91a5;
+  --accent:#e10600;--ok:#2ecc71;--warn:#f1c40f;--purple:#b46bff;--green:#35d07f;--blue:#4aa3ff;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,Segoe UI,Roboto,sans-serif}
+button,input,select{font:inherit;color:var(--text)}
+input,select{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:0}
+input:focus,select:focus{outline:1px solid var(--accent)}
+button{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--mute)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.danger{border-color:#7a2a2a;color:#ff8a8a}
+button.small{padding:2px 8px;font-size:12px}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+header h1{font-size:16px;margin:0 12px 0 0;letter-spacing:.5px}
+header h1 b{color:var(--accent)}
+#conn input:not([type=checkbox]){width:150px}#conn input[type=password]{width:230px}#conn input.port{width:70px}
+.badge{padding:2px 8px;border-radius:99px;font-size:12px;border:1px solid var(--line);color:var(--mute)}
+.badge.on{color:var(--ok);border-color:var(--ok)}.badge.admin{color:var(--warn);border-color:var(--warn)}
+nav{display:flex;gap:2px;padding:0 16px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto}
+nav button{border:0;border-bottom:2px solid transparent;border-radius:0;background:none;padding:10px 14px;color:var(--mute)}
+nav button.active{color:var(--text);border-bottom-color:var(--accent)}
+main{padding:16px;max-width:1700px;margin:0 auto}
+.tab{display:none}.tab.active{display:block}
+.live{display:grid;grid-template-columns:minmax(560px,1.1fr) minmax(360px,1fr);gap:16px}
+@media(max-width:1000px){.live{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:16px}
+.card h2{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:var(--mute)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:16px}
+table{width:100%;border-collapse:collapse}
+th{font-size:11px;text-transform:uppercase;color:var(--mute);text-align:right;padding:4px 6px;font-weight:600}
+td{padding:5px 6px;text-align:right;border-top:1px solid var(--line);font-variant-numeric:tabular-nums;white-space:nowrap}
+th:nth-child(-n+3),td:nth-child(-n+3){text-align:left}
+td.name{max-width:140px;overflow:hidden;text-overflow:ellipsis}
+tr.pit td{opacity:.6}
+.team{display:inline-block;width:4px;height:14px;border-radius:2px;margin-right:6px;vertical-align:-2px}
+.purple{color:var(--purple);font-weight:600}.green{color:var(--green)}.yellow{color:var(--warn)}.mute{color:var(--mute)}
+.sessionbar{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-bottom:16px}
+.sessionbar .big{font-size:20px;font-weight:700}
+.flag{padding:3px 10px;border-radius:6px;font-weight:700;font-size:12px;background:var(--panel2)}
+.flag.GREEN{background:#1c6b3e}.flag.YELLOW{background:#8a7400}.flag.RED{background:#8a1c1c}
+.flag.SAFETY_CAR,.flag.VIRTUAL_SAFETY_CAR{background:#8a5a00}.flag.CHEQUERED{background:#fff;color:#000}
+#mapwrap{position:relative;background:#0a0c10;border-radius:8px;overflow:hidden}
+#map{display:block;width:100%;height:520px;cursor:grab;touch-action:none}
+#mapinfo{position:absolute;left:8px;top:8px;font-size:12px;color:var(--mute);pointer-events:none}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--mute);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:3px;margin-right:4px;vertical-align:middle}
+.list>div{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
+.list>div:first-child{border-top:0}.list .grow{flex:1;min-width:120px}
+label{color:var(--mute);font-size:12px}
+#log{height:560px;overflow:auto;font:12px/1.5 ui-monospace,Consolas,monospace;background:#0a0c10;border-radius:8px;padding:8px}
+#log div{border-bottom:1px solid #151922;padding:1px 0}#log .err{color:#ff8a8a}#log time{color:var(--mute);margin-right:8px}
+#toast{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:9}
+#toast div{background:var(--panel2);border:1px solid var(--line);border-left:4px solid var(--ok);padding:8px 12px;border-radius:6px;max-width:420px}
+#toast div.err{border-left-color:var(--accent)}
+.empty{color:var(--mute);padding:12px 0}
+.note{color:var(--mute);font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1><b>F1</b> Telemetry Panel</h1>
+  <form id="conn" class="row" style="margin:0" autocomplete="off">
+    <input id="host" placeholder="host" value="localhost" aria-label="host">
+    <input id="port" class="port" placeholder="puerto" value="8765" aria-label="puerto">
+    <input id="token" type="password" placeholder="token (admin o read)" aria-label="token">
+    <label style="display:flex;gap:4px;align-items:center"><input id="tls" type="checkbox" style="min-width:auto"> wss</label>
+    <button id="connect" class="primary" type="submit">Conectar</button>
+    <button id="disconnect" type="button" disabled>Desconectar</button>
+  </form>
+  <span id="status" class="badge">desconectado</span>
+  <span id="scope" class="badge" hidden></span>
+</header>
+<nav id="tabs">
+  <button data-tab="live" class="active">Directo</button>
+  <button data-tab="session">Sesión</button>
+  <button data-tab="roster">Equipos y pilotos</button>
+  <button data-tab="penalties">Sanciones</button>
+  <button data-tab="log">Registro</button>
+</nav>
+<main>
+
+<section id="live" class="tab active">
+  <div class="sessionbar">
+    <span class="big" id="sbTitle">Sin sesión</span>
+    <span id="sbPhase" class="badge"></span>
+    <span id="sbClock" class="big mute"></span>
+    <span id="sbFlag" class="flag" hidden></span>
+  </div>
+  <div class="live">
+    <div class="card">
+      <h2>Clasificación</h2>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>P</th><th>Piloto</th><th>Equipo</th><th>Vueltas</th><th>Última</th><th>Mejor</th><th>Gap</th><th>Int</th><th>Pits</th><th></th></tr></thead>
+        <tbody id="standings"></tbody>
+      </table></div>
+      <div id="standingsEmpty" class="empty">Sin datos de tiempos todavía.</div>
+    </div>
+    <div class="card">
+      <h2>Mapa <span class="note" id="mapTrackName"></span></h2>
+      <div class="row">
+        <select id="mapTrack" aria-label="pista del mapa"></select>
+        <button id="mapFit" class="small">Centrar</button>
+        <label style="display:flex;gap:4px;align-items:center"><input id="mapLabels" type="checkbox" checked style="min-width:auto"> nombres</label>
+        <label style="display:flex;gap:4px;align-items:center"><input id="mapSnap" type="checkbox" style="min-width:auto"> pegar a la línea</label>
+      </div>
+      <div id="mapwrap"><canvas id="map"></canvas><div id="mapinfo"></div></div>
+      <div class="legend">
+        <span><i style="background:#3a4156"></i>trazada</span>
+        <span><i style="background:#e10600"></i>meta</span>
+        <span><i style="background:#4aa3ff"></i>sector</span>
+        <span><i style="background:#f1c40f"></i>boxes</span>
+        <span>rueda: zoom · arrastrar: mover</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="session" class="tab">
+  <div class="grid2">
+    <div>
+      <div class="card">
+        <h2>Crear sesión</h2>
+        <div class="row">
+          <select id="newType"><option value="practice">Práctica</option><option value="qualifying">Clasificación</option><option value="race" selected>Carrera</option></select>
+          <select id="newTrack" aria-label="pista"></select>
+          <input id="newAmount" type="number" min="1" value="5" style="width:80px" aria-label="cantidad">
+          <span class="note" id="amountHint">vueltas</span>
+          <button class="admin" data-do="createSession">Crear</button>
+        </div>
+        <div id="trackProblems" class="note"></div>
+      </div>
+      <div class="card">
+        <h2>Control de sesión</h2>
+        <div class="row">
+          <button class="admin" data-req="session.grid">Preparar parrilla</button>
+          <button class="admin primary" data-req="session.start">Salida</button>
+          <button class="admin" data-req="session.finish">Finalizar</button>
+          <button class="admin danger" data-do="abortSession">Abortar</button>
+        </div>
+        <h2 style="margin-top:14px">Banderas</h2>
+        <div class="row">
+          <button class="admin" data-status="green">Verde</button>
+          <button class="admin" data-status="normal">Normal</button>
+          <button class="admin" data-status="safety_car">Safety car</button>
+          <button class="admin" data-status="virtual_safety_car">VSC</button>
+          <button class="admin danger" data-status="red">Roja</button>
+        </div>
+        <div class="row">
+          <label>Amarilla en sector</label>
+          <input id="yellowSector" type="number" min="1" value="1" style="width:70px">
+          <button class="admin" data-do="yellow">Amarilla</button>
+          <button class="admin" data-req="status.clear">Quitar amarillas</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Parrilla / inscritos</h2>
+      <div class="row">
+        <select id="entryDriver" aria-label="piloto a inscribir"></select>
+        <button class="admin" data-do="addEntry">Inscribir</button>
+        <button class="admin" data-req="session.entry.addAll">Inscribir a todos</button>
+      </div>
+      <div id="entries" class="list"></div>
+      <div class="note">Se puede reordenar y quitar hasta que se da la salida.</div>
+    </div>
+  </div>
+</section>
+
+<section id="roster" class="tab">
+  <div class="grid2">
+    <div class="card">
+      <h2>Equipos</h2>
+      <div class="row">
+        <input id="teamName" placeholder="nombre" style="width:150px">
+        <input id="teamColor" type="color" value="#e10600" style="padding:0;width:40px;height:32px">
+        <input id="teamBrand" placeholder="marca del vehículo" style="width:150px">
+        <button class="admin" data-do="createTeam">Crear equipo</button>
+      </div>
+      <div id="teams" class="list"></div>
+    </div>
+    <div class="card">
+      <h2>Registrar piloto</h2>
+      <div class="row">
+        <input id="drvName" placeholder="jugador" style="width:140px">
+        <input id="drvUuid" placeholder="UUID (si no está conectado)" style="width:230px">
+        <input id="drvNumber" type="number" min="1" placeholder="nº" style="width:70px">
+        <input id="drvAbbr" placeholder="ABR" maxlength="3" style="width:70px;text-transform:uppercase">
+        <select id="drvTeam" aria-label="equipo"></select>
+        <button class="admin" data-do="registerDriver">Registrar</button>
+      </div>
+    </div>
+  </div>
+  <div class="card"><h2>Pilotos</h2><div id="drivers" class="list"></div></div>
+</section>
+
+<section id="penalties" class="tab">
+  <div class="grid2">
+    <div class="card">
+      <h2>Nueva sanción</h2>
+      <div class="row">
+        <select id="penDriver" aria-label="piloto"></select>
+        <select id="penType">
+          <option value="warning">Aviso</option><option value="time_penalty">Penalización de tiempo</option>
+          <option value="drive_through">Drive-through</option><option value="stop_and_go">Stop &amp; go</option>
+          <option value="disqualification">Descalificación</option>
+        </select>
+        <input id="penSeconds" type="number" min="1" value="5" style="width:70px" aria-label="segundos">
+        <input id="penReason" placeholder="motivo" style="width:220px">
+        <button class="admin" data-do="issuePenalty">Sancionar</button>
+      </div>
+    </div>
+    <div class="card"><h2>Sanciones de la sesión</h2><div id="penList" class="list"></div></div>
+  </div>
+</section>
+
+<section id="log" class="tab">
+  <div class="card">
+    <h2>Eventos</h2>
+    <div class="row"><button id="logClear" class="small">Vaciar</button><label style="display:flex;gap:4px;align-items:center"><input id="logStandings" type="checkbox" style="min-width:auto"> incluir timing.standings</label></div>
+    <div id="log"></div>
+  </div>
+</section>
+</main>
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const store = {
+  get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} }
+};
+function toast(msg, err) {
+  const d = document.createElement("div");
+  if (err) d.className = "err";
+  d.textContent = msg;
+  $("#toast").append(d);
+  setTimeout(() => d.remove(), err ? 6000 : 2500);
+}
+function fmtLap(ms) {
+  if (ms == null) return "-";
+  const m = Math.floor(ms / 60000), s = ((ms % 60000) / 1000).toFixed(3).padStart(6, "0");
+  return m ? `${m}:${s}` : s.replace(/^0/, "");
+}
+function fmtGap(ms, laps) {
+  if (laps > 0) return `+${laps}L`;
+  if (ms == null) return "-";
+  return "+" + fmtLap(ms);
+}
+function fmtClock(ms) {
+  ms = Math.max(0, ms);
+  const t = Math.floor(ms / 1000), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60;
+  return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(s).padStart(2, "0");
+}
+function colorOf(team) { const t = state.teams.find(x => x.name === team); return t ? "#" + String(t.colorHex).replace("#", "") : "#888"; }
+function driverById(id) { return state.drivers.find(d => d.playerId === id); }
+function labelOf(id) { const d = driverById(id); return d ? d.abbreviation : String(id).slice(0, 8); }
+function fillSelect(el, items, empty) {
+  const keep = el.value;
+  el.innerHTML = items.length ? items.map(i => `<option value="${esc(i.value)}">${esc(i.label)}</option>`).join("") : `<option value="">${esc(empty || "—")}</option>`;
+  if (items.some(i => i.value === keep)) el.value = keep;
+}
+
+/* ---------- state ---------- */
+const state = { session: null, tracks: [], teams: [], drivers: [], standings: { entries: [], fastestLapMillis: null }, penalties: [], scope: null, serverOffset: 0 };
+let ws = null, nextId = 1; const pending = new Map();
+
+/* ---------- connection ---------- */
+function setStatus(text, on) { const b = $("#status"); b.textContent = text; b.classList.toggle("on", !!on); }
+function connect(ev) {
+  ev.preventDefault();
+  if (ws) return;
+  const host = $("#host").value.trim(), port = $("#port").value.trim(), token = $("#token").value.trim();
+  if (!host || !token) return toast("Falta el host o el token", true);
+  store.set("f1.host", host); store.set("f1.port", port); store.set("f1.tls", $("#tls").checked ? "1" : "");
+  const url = `${$("#tls").checked ? "wss" : "ws"}://${host}${port ? ":" + port : ""}/?token=${encodeURIComponent(token)}`;
+  setStatus("conectando…");
+  let opened = false;
+  try { ws = new WebSocket(url); } catch (e) { setStatus("desconectado"); ws = null; return toast("URL inválida: " + e.message, true); }
+  const mine = ws;
+  mine.onopen = () => { opened = true; $("#connect").disabled = true; $("#disconnect").disabled = false; $("#token").value = ""; setStatus("conectado", true); log("conectado"); };
+  mine.onmessage = e => { try { handle(JSON.parse(e.data)); } catch (err) { log("mensaje no válido: " + err.message, true); } };
+  mine.onclose = () => {
+    if (ws === mine) ws = null;
+    for (const [, p] of pending) p.reject(new Error("conexión cerrada"));
+    pending.clear();
+    $("#connect").disabled = false; $("#disconnect").disabled = true;
+    setStatus("desconectado"); $("#scope").hidden = true; state.scope = null; applyScope();
+    log(opened ? "desconectado (el token era de un solo uso: genera otro para volver a entrar)" : "no se pudo conectar: token inválido o ya usado, o servidor inaccesible", !opened);
+    if (!opened) toast("No se pudo conectar. ¿Token nuevo? ¿Puerto abierto?", true);
+  };
+  mine.onerror = () => {};
+}
+function request(type, payload) {
+  return new Promise((resolve, reject) => {
+    if (!ws || ws.readyState !== 1) return reject(new Error("no conectado"));
+    const id = String(nextId++);
+    const t = setTimeout(() => { pending.delete(id); reject(new Error("sin respuesta")); }, 10000);
+    pending.set(id, { resolve: v => { clearTimeout(t); resolve(v); }, reject: e => { clearTimeout(t); reject(e); } });
+    ws.send(JSON.stringify({ type, id, payload: payload ?? {} }));
+  });
+}
+async function act(type, payload, okMsg) {
+  try { const r = await request(type, payload); if (okMsg !== false) toast(okMsg || type); return r; }
+  catch (e) { toast(e.message, true); log(`${type}: ${e.message}`, true); }
+}
+
+/* ---------- incoming ---------- */
+function handle(m) {
+  const p = m.payload;
+  if (m.id && pending.has(m.id)) {
+    const w = pending.get(m.id); pending.delete(m.id);
+    return m.type === "error" ? w.reject(new Error(p.message || p.code)) : w.resolve(p);
+  }
+  switch (m.type) {
+    case "hello": state.scope = p.scope; $("#scope").hidden = false; $("#scope").textContent = String(p.scope).toLowerCase();
+      $("#scope").classList.toggle("admin", isAdmin()); applyScope(); break;
+    case "snapshot": loadSnapshot(p); break;
+    case "session.changed": state.session = p.session; if (!p.session) { state.standings = { entries: [], fastestLapMillis: null }; } renderSession(); break;
+    case "session.trackStatus": if (state.session) { state.session.trackStatus = p.status; state.session.yellowSectors = p.yellowSectors; } renderSessionBar(); break;
+    case "roster.changed": state.teams = p.teams; state.drivers = p.drivers; renderRoster(); renderStandings(); renderEntries(); break;
+    case "track.changed": state.tracks = p.tracks; renderTracks(); if (p.trackName === currentMapTrack()) loadMapTrack(p.trackName); break;
+    case "timing.standings": state.standings = p; renderStandings(); if ($("#logStandings").checked) log("timing.standings"); return;
+    case "timing.positions": onPositions(p); return;
+    case "penalty.issued": state.penalties.push(p.penalty); renderPenalties(); break;
+    case "penalty.served": state.penalties = state.penalties.map(x => x.id === p.penalty.id ? p.penalty : x); renderPenalties(); break;
+    case "penalty.cancelled": state.penalties = state.penalties.filter(x => x.id !== p.penalty.id); renderPenalties(); break;
+    case "error": log(`${p.code}: ${p.message}`, true); toast(p.message, true); return;
+  }
+  describeEvent(m);
+}
+function describeEvent(m) {
+  const p = m.payload;
+  switch (m.type) {
+    case "timing.lap": return log(`vuelta ${p.lap.lapNumber} de ${labelOf(p.driverId)}: ${fmtLap(p.lap.millis)}${p.fastestOfSession ? " (la más rápida)" : ""}`);
+    case "timing.sector": return log(`sector ${p.sector.sector} de ${labelOf(p.driverId)}: ${fmtLap(p.sector.millis)} ${p.sector.rating}`);
+    case "timing.pit.enter": return log(`${labelOf(p.driverId)} entra a boxes (${p.pitStopNumber})`);
+    case "timing.pit.exit": return log(`${labelOf(p.driverId)} sale de boxes (${fmtLap(p.pitLaneMillis)})`);
+    case "timing.finished": return log(`${labelOf(p.driverId)} termina (${p.completedLaps} vueltas)`);
+    case "timing.chequered": return log("bandera de cuadros");
+    case "timing.order": return;
+    case "session.changed": return log("sesión: " + (p.session ? `${p.session.type} ${p.phase}` : "sin sesión"));
+    case "session.trackStatus": return log("bandera: " + p.status);
+    case "roster.changed": return log("roster actualizado");
+    case "track.changed": return log("pista cambiada: " + p.trackName);
+    case "penalty.issued": case "penalty.served": case "penalty.cancelled":
+      return log(`${m.type} #${p.penalty.id} ${labelOf(p.penalty.driverId)} ${p.penalty.type}`);
+    case "custom.event": return log(`custom ${p.namespace}:${p.name} ${JSON.stringify(p.data)}`);
+    default: return log(m.type);
+  }
+}
+function loadSnapshot(s) {
+  state.serverOffset = s.serverTimeMillis - Date.now();
+  state.session = s.session; state.tracks = s.tracks; state.teams = s.teams; state.drivers = s.drivers;
+  state.standings = s.standings; state.penalties = s.penalties;
+  renderAll();
+  request("positions.subscribe").then(r => log(`posiciones cada ${r.intervalMillis} ms`)).catch(e => log("posiciones: " + e.message, true));
+  const t = s.session?.track || s.tracks.find(x => x.ready)?.name || s.tracks[0]?.name;
+  if (t) { $("#mapTrack").value = t; loadMapTrack(t); }
+}
+
+/* ---------- logging ---------- */
+function log(text, err) {
+  const box = $("#log"), d = document.createElement("div");
+  if (err) d.className = "err";
+  const t = document.createElement("time"); t.textContent = new Date().toLocaleTimeString();
+  d.append(t, document.createTextNode(text)); box.append(d);
+  while (box.childElementCount > 500) box.firstChild.remove();
+  box.scrollTop = box.scrollHeight;
+}
+
+/* ---------- rendering ---------- */
+const isAdmin = () => state.scope === "ADMIN" || state.scope === "admin";
+function applyScope() { $$(".admin").forEach(b => { b.disabled = !isAdmin(); b.title = isAdmin() ? "" : "Requiere token admin"; }); $$("[data-adm]").forEach(b => b.disabled = !isAdmin()); }
+function renderAll() { renderSession(); renderTracks(); renderRoster(); renderStandings(); renderPenalties(); applyScope(); }
+
+function renderSession() { renderSessionBar(); renderEntries(); renderStandings(); applyScope(); }
+function renderSessionBar() {
+  const s = state.session;
+  $("#sbTitle").textContent = s ? `${s.type} · ${s.track}` : "Sin sesión";
+  const ph = $("#sbPhase"); ph.textContent = s ? s.phase : ""; ph.hidden = !s;
+  const f = $("#sbFlag"); f.hidden = !s; if (s) { f.textContent = s.trackStatus + (s.yellowSectors?.length ? " S" + s.yellowSectors.join(",") : ""); f.className = "flag " + s.trackStatus; }
+  tickClock();
+}
+function tickClock() {
+  const s = state.session, el = $("#sbClock");
+  if (!s) return (el.textContent = "");
+  if (s.phase === "RUNNING") {
+    const elapsed = Date.now() + state.serverOffset - s.startedAtMillis;
+    if (s.type === "RACE") {
+      const lead = state.standings.entries[0]?.completedLaps ?? 0;
+      el.textContent = `Vuelta ${Math.min(lead + 1, s.lapCount)}/${s.lapCount} · ${fmtClock(elapsed)}`;
+    } else el.textContent = `${fmtClock(s.durationMinutes * 60000 - elapsed)} restantes`;
+  } else el.textContent = s.type === "RACE" ? `${s.lapCount} vueltas` : `${s.durationMinutes} min`;
+}
+setInterval(tickClock, 500);
+
+function renderStandings() {
+  const en = state.standings.entries, tb = $("#standings");
+  $("#standingsEmpty").hidden = en.length > 0;
+  tb.innerHTML = en.map(e => {
+    const d = driverById(e.driverId), col = d ? colorOf(d.teamName) : "#888";
+    const best = e.bestLapMillis != null && e.bestLapMillis === state.standings.fastestLapMillis;
+    const extra = [e.finished ? "🏁" : "", e.inPit ? "PIT" : "", e.warnings ? "⚠" + e.warnings : "", e.timePenaltyMillis ? "+" + e.timePenaltyMillis / 1000 + "s" : "", e.pendingServicePenalties ? "⏳" + e.pendingServicePenalties : ""].filter(Boolean).join(" ");
+    const st = d && ["RETIRED", "DISQUALIFIED", "DISCONNECTED"].includes(d.status) ? d.status.slice(0, 3) : "";
+    return `<tr class="${e.inPit ? "pit" : ""}" title="${esc(e.nextCheckpoint ? "espera: " + e.nextCheckpoint : "")}">
+      <td>${e.position}</td><td class="name"><span class="team" style="background:${col}"></span><b>${esc(d?.abbreviation ?? "???")}</b> <span class="mute">${esc(d?.playerName ?? "")}</span></td>
+      <td class="mute">${esc(d?.teamName ?? "")}</td><td>${e.completedLaps}</td><td>${fmtLap(e.lastLapMillis)}</td>
+      <td class="${best ? "purple" : ""}">${fmtLap(e.bestLapMillis)}</td><td>${e.position === 1 ? "—" : fmtGap(e.gapToLeaderMillis, e.gapToLeaderLaps)}</td>
+      <td>${e.position === 1 ? "—" : fmtGap(e.intervalMillis, e.intervalLaps)}</td><td>${e.pitStops}</td><td class="yellow">${esc(st || extra)}</td></tr>`;
+  }).join("");
+  tickClock();
+}
+
+function renderTracks() {
+  const items = state.tracks.map(t => ({ value: t.name, label: t.name + (t.ready ? "" : " (incompleta)") }));
+  fillSelect($("#mapTrack"), items, "sin pistas"); fillSelect($("#newTrack"), items, "sin pistas");
+  showTrackProblems();
+}
+function showTrackProblems() {
+  const t = state.tracks.find(x => x.name === $("#newTrack").value);
+  $("#trackProblems").innerHTML = t?.problems?.length ? "⚠ " + t.problems.map(esc).join("<br>⚠ ") : "";
+}
+
+function renderRoster() {
+  const teamOpts = state.teams.map(t => ({ value: t.name, label: t.name }));
+  fillSelect($("#drvTeam"), teamOpts, "crea un equipo");
+  const drvOpts = state.drivers.map(d => ({ value: d.playerId, label: `${d.abbreviation} · ${d.playerName}` }));
+  fillSelect($("#entryDriver"), drvOpts, "sin pilotos"); fillSelect($("#penDriver"), drvOpts, "sin pilotos");
+  $("#teams").innerHTML = state.teams.length ? state.teams.map(t => `<div data-team="${esc(t.name)}">
+    <span class="team" style="background:#${esc(String(t.colorHex).replace("#", ""))}"></span><span class="grow"><b>${esc(t.name)}</b> <span class="mute">${esc(t.vehicleBrand)} · ${state.drivers.filter(d => d.teamName === t.name).length} pilotos</span></span>
+    <input type="color" value="#${esc(String(t.colorHex).replace("#", ""))}" data-adm data-act="teamColor" style="padding:0;width:36px;height:26px">
+    <button class="small danger" data-adm data-act="deleteTeam">Borrar</button></div>`).join("") : `<div class="empty">Sin equipos</div>`;
+  const statuses = ["WAITING", "ON_TRACK", "IN_PIT", "FINISHED", "RETIRED", "DISQUALIFIED", "DISCONNECTED"];
+  $("#drivers").innerHTML = state.drivers.length ? state.drivers.map(d => `<div data-driver="${esc(d.playerId)}">
+    <span class="team" style="background:${colorOf(d.teamName)}"></span><span class="grow"><b>${esc(d.abbreviation)}</b> #${d.number} <span class="mute">${esc(d.playerName)}</span></span>
+    <select data-adm data-act="driverTeam">${state.teams.map(t => `<option ${t.name === d.teamName ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>
+    <select data-adm data-act="driverStatus">${statuses.map(s => `<option ${s === d.status ? "selected" : ""}>${s}</option>`).join("")}</select>
+    <button class="small" data-adm data-act="editDriver">Editar</button>
+    <button class="small danger" data-adm data-act="removeDriver">Quitar</button></div>`).join("") : `<div class="empty">Sin pilotos</div>`;
+  applyScope();
+}
+
+function renderEntries() {
+  const s = state.session, box = $("#entries");
+  if (!s) { box.innerHTML = `<div class="empty">No hay sesión</div>`; return; }
+  const locked = s.phase === "RUNNING" || s.phase === "FINISHED";
+  box.innerHTML = s.entries.length ? s.entries.map((id, i) => `<div data-id="${esc(id)}" data-pos="${i + 1}">
+    <span style="width:24px" class="mute">${i + 1}</span><span class="team" style="background:${colorOf(driverById(id)?.teamName)}"></span>
+    <span class="grow"><b>${esc(labelOf(id))}</b> <span class="mute">${esc(driverById(id)?.playerName ?? "")}</span></span>
+    <button class="small" data-adm data-act="up" ${locked || i === 0 ? "disabled" : ""}>↑</button>
+    <button class="small" data-adm data-act="down" ${locked || i === s.entries.length - 1 ? "disabled" : ""}>↓</button>
+    <button class="small danger" data-adm data-act="unentry" ${locked ? "disabled" : ""}>Quitar</button></div>`).join("") : `<div class="empty">Nadie inscrito</div>`;
+  applyScope();
+  if (locked) $$("#entries button").forEach(b => b.disabled = true);
+}
+
+function renderPenalties() {
+  $("#penList").innerHTML = state.penalties.length ? state.penalties.map(p => `<div data-id="${p.id}">
+    <span class="grow"><b>#${p.id}</b> ${esc(labelOf(p.driverId))} · ${esc(p.type)}${p.seconds ? " " + p.seconds + "s" : ""} <span class="mute">${esc(p.reason)}</span></span>
+    ${p.served ? `<span class="badge on">cumplida</span>` : `<button class="small" data-adm data-act="servePen">Cumplida</button>`}
+    <button class="small danger" data-adm data-act="cancelPen">Anular</button></div>`).join("") : `<div class="empty">Sin sanciones</div>`;
+  applyScope();
+}
+
+/* ---------- actions ---------- */
+const actions = {
+  createSession() {
+    const type = $("#newType").value, track = $("#newTrack").value, amount = +$("#newAmount").value;
+    if (!track) return toast("Elige una pista", true);
+    act("session.create", { type, track, amount }, "Sesión creada");
+  },
+  abortSession() { if (confirm("¿Abortar la sesión?")) act("session.abort", {}, "Sesión abortada"); },
+  yellow() { act("status.yellow", { sector: +$("#yellowSector").value }, "Amarilla"); },
+  addEntry() { const d = $("#entryDriver").value; if (d) act("session.entry.add", { driver: d }, "Inscrito"); },
+  createTeam() {
+    const name = $("#teamName").value.trim(), brand = $("#teamBrand").value.trim();
+    if (!name) return toast("Falta el nombre", true);
+    act("team.create", { name, colorHex: $("#teamColor").value, vehicleBrand: brand || name }, "Equipo creado").then(r => r && ($("#teamName").value = ""));
+  },
+  registerDriver() {
+    const p = { playerName: $("#drvName").value.trim(), number: +$("#drvNumber").value, abbreviation: $("#drvAbbr").value.trim().toUpperCase(), team: $("#drvTeam").value };
+    const u = $("#drvUuid").value.trim(); if (u) p.uuid = u;
+    if (!p.playerName || !p.number || !p.abbreviation || !p.team) return toast("Rellena jugador, número, abreviatura y equipo", true);
+    act("driver.register", p, "Piloto registrado").then(r => { if (r) ["#drvName", "#drvUuid", "#drvNumber", "#drvAbbr"].forEach(s => $(s).value = ""); });
+  },
+  issuePenalty() {
+    const type = $("#penType").value, driver = $("#penDriver").value;
+    if (!driver) return toast("Elige un piloto", true);
+    const p = { driver, penaltyType: type, reason: $("#penReason").value.trim() };
+    if (type === "time_penalty" || type === "stop_and_go") p.seconds = +$("#penSeconds").value;
+    act("penalty.issue", p, "Sanción emitida");
+  }
+};
+document.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.do) return actions[b.dataset.do]();
+  if (b.dataset.req) return act(b.dataset.req, {}, b.textContent.trim());
+  if (b.dataset.status) return act("status.set", { status: b.dataset.status }, "Bandera: " + b.textContent.trim());
+  const row = b.closest("[data-team],[data-driver],#entries>div,#penList>div"), a = b.dataset.act; if (!a || !row) return;
+  if (a === "deleteTeam") { if (confirm("¿Borrar el equipo?")) act("team.delete", { name: row.dataset.team }, "Equipo borrado"); }
+  else if (a === "removeDriver") { if (confirm("¿Quitar al piloto?")) act("driver.remove", { driver: row.dataset.driver }, "Piloto quitado"); }
+  else if (a === "editDriver") {
+    const d = driverById(row.dataset.driver); const n = prompt("Número", d.number); if (n === null) return;
+    const ab = prompt("Abreviatura", d.abbreviation); if (ab === null) return;
+    act("driver.edit", { driver: d.playerId, number: +n, abbreviation: ab.toUpperCase() }, "Piloto editado");
+  }
+  else if (a === "up" || a === "down") act("session.entry.move", { driver: row.dataset.id, position: +row.dataset.pos + (a === "up" ? -1 : 1) }, false);
+  else if (a === "unentry") act("session.entry.remove", { driver: row.dataset.id }, "Quitado de la parrilla");
+  else if (a === "servePen") act("penalty.serve", { id: +row.dataset.id }, "Sanción cumplida");
+  else if (a === "cancelPen") act("penalty.cancel", { id: +row.dataset.id }, "Sanción anulada");
+});
+document.addEventListener("change", e => {
+  const el = e.target, row = el.closest("[data-team],[data-driver]"), a = el.dataset.act; if (!a || !row) return;
+  if (a === "driverTeam") act("driver.team", { driver: row.dataset.driver, team: el.value }, "Equipo cambiado");
+  else if (a === "driverStatus") act("driver.status", { driver: row.dataset.driver, status: el.value }, "Estado cambiado");
+  else if (a === "teamColor") act("team.edit", { name: row.dataset.team, colorHex: el.value }, "Color cambiado");
+});
+$("#newType").addEventListener("change", () => { const r = $("#newType").value === "race"; $("#amountHint").textContent = r ? "vueltas" : "minutos"; $("#newAmount").value = r ? 5 : 10; });
+$("#newTrack").addEventListener("change", showTrackProblems);
+$("#tabs").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  $$("#tabs button").forEach(x => x.classList.toggle("active", x === b));
+  $$(".tab").forEach(t => t.classList.toggle("active", t.id === b.dataset.tab));
+  if (b.dataset.tab === "live") requestAnimationFrame(resizeMap);
+});
+$("#conn").addEventListener("submit", connect);
+$("#disconnect").addEventListener("click", () => ws && ws.close());
+$("#logClear").addEventListener("click", () => $("#log").replaceChildren());
+
+/* ---------- map ---------- */
+const cv = $("#map"), ctx = cv.getContext("2d");
+const map = { track: null, name: null, view: { x: 0, y: 0, k: 1 }, cars: new Map(), interval: 100, lastMsg: 0, dpr: 1 };
+const currentMapTrack = () => $("#mapTrack").value;
+async function loadMapTrack(name) {
+  if (!name || !ws) return;
+  try {
+    map.track = await request("track.get", { name }); map.name = name;
+    $("#mapTrackName").textContent = "· " + name;
+    buildTrackIndex(); fitMap();
+  } catch (e) { map.track = null; $("#mapTrackName").textContent = "· " + e.message; }
+}
+$("#mapTrack").addEventListener("change", () => loadMapTrack($("#mapTrack").value));
+$("#mapFit").addEventListener("click", fitMap);
+
+let cum = [], total = 0;
+function buildTrackIndex() {
+  const c = map.track?.centerline ?? []; cum = [0]; total = 0;
+  for (let i = 1; i < c.length; i++) { total += Math.hypot(c[i].x - c[i - 1].x, c[i].z - c[i - 1].z); cum.push(total); }
+}
+function pointAtProgress(p) {
+  const c = map.track?.centerline; if (!c || c.length < 2 || !total) return null;
+  const d = (((p % 1) + 1) % 1) * total; let lo = 0, hi = cum.length - 1;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (cum[mid] <= d) lo = mid; else hi = mid; }
+  const span = cum[hi] - cum[lo] || 1, t = (d - cum[lo]) / span;
+  return { x: c[lo].x + (c[hi].x - c[lo].x) * t, z: c[lo].z + (c[hi].z - c[lo].z) * t };
+}
+function resizeMap() {
+  const r = cv.getBoundingClientRect(); map.dpr = window.devicePixelRatio || 1;
+  cv.width = Math.max(1, r.width * map.dpr); cv.height = Math.max(1, r.height * map.dpr);
+}
+function fitMap() {
+  resizeMap();
+  const b = map.track?.bounds, w = cv.width / map.dpr, h = cv.height / map.dpr;
+  if (!b) { map.view = { x: 0, y: 0, k: 1 }; return; }
+  const bw = Math.max(1, b.maxX - b.minX), bh = Math.max(1, b.maxZ - b.minZ), k = Math.min(w / bw, h / bh) * 0.9;
+  map.view = { k, x: w / 2 - (b.minX + bw / 2) * k, y: h / 2 - (b.minZ + bh / 2) * k };
+}
+window.addEventListener("resize", resizeMap);
+const sx = x => x * map.view.k + map.view.x, sz = z => z * map.view.k + map.view.y;
+
+function onPositions(p) {
+  const now = performance.now(); map.interval = p.intervalMillis || 100; map.lastMsg = now;
+  const seen = new Set();
+  for (const d of p.drivers) {
+    seen.add(d.driverId); const c = map.cars.get(d.driverId);
+    const cur = { x: d.x, z: d.z, yaw: d.yaw, progress: d.progress, off: d.offLineDistance, speed: d.speed, inPit: d.inPit };
+    if (!c) map.cars.set(d.driverId, { prev: cur, cur, at: now });
+    else { c.prev = renderPose(c, now); c.cur = cur; c.at = now; }
+  }
+  for (const id of [...map.cars.keys()]) if (!seen.has(id)) map.cars.delete(id);
+}
+function target(c) {
+  if ($("#mapSnap").checked && c.progress != null && c.off != null && c.off < 25 && !c.inPit) { const q = pointAtProgress(c.progress); if (q) return { x: q.x, z: q.z, yaw: c.yaw, speed: c.speed, inPit: c.inPit }; }
+  return c;
+}
+function renderPose(car, now) {
+  const t = Math.min(1, (now - car.at) / map.interval), a = target(car.prev), b = target(car.cur);
+  let dy = ((b.yaw - a.yaw + 540) % 360) - 180;
+  return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, yaw: a.yaw + dy * t, speed: b.speed, inPit: b.inPit, progress: b.progress, off: b.off };
+}
+function drawMap(now) {
+  requestAnimationFrame(drawMap);
+  if (!cv.offsetParent) return;
+  if (!cv.width) resizeMap();
+  const w = cv.width / map.dpr, h = cv.height / map.dpr;
+  ctx.setTransform(map.dpr, 0, 0, map.dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+  const tr = map.track;
+  if (!tr) { ctx.fillStyle = "#8a91a5"; ctx.font = "14px system-ui"; ctx.textAlign = "center"; ctx.fillText(ws ? "Elige una pista con trazada" : "Conéctate para ver el mapa", w / 2, h / 2); return; }
+  if (tr.centerline.length > 1) {
+    ctx.lineJoin = "round"; ctx.lineCap = "round"; ctx.strokeStyle = "#2a3040"; ctx.lineWidth = Math.max(8, 10 * map.view.k);
+    ctx.beginPath(); tr.centerline.forEach((p, i) => i ? ctx.lineTo(sx(p.x), sz(p.z)) : ctx.moveTo(sx(p.x), sz(p.z))); ctx.stroke();
+    ctx.strokeStyle = "#3a4156"; ctx.lineWidth = 2; ctx.stroke();
+  }
+  ctx.font = "11px system-ui"; ctx.textAlign = "left";
+  for (const c of tr.checkpoints) {
+    const col = c.kind === "START_FINISH" ? "#e10600" : c.kind.startsWith("PIT") ? "#f1c40f" : "#4aa3ff";
+    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = c.kind === "START_FINISH" ? 4 : 3;
+    ctx.beginPath(); ctx.moveTo(sx(c.left.x), sz(c.left.z)); ctx.lineTo(sx(c.right.x), sz(c.right.z)); ctx.stroke();
+    ctx.fillText(c.name, sx(c.right.x) + 4, sz(c.right.z) - 4);
+  }
+  const labels = $("#mapLabels").checked;
+  for (const [id, car] of map.cars) {
+    const p = renderPose(car, now), d = driverById(id), col = d ? colorOf(d.teamName) : "#fff", x = sx(p.x), y = sz(p.z);
+    const rad = (p.yaw * Math.PI) / 180, fx = -Math.sin(rad), fz = Math.cos(rad);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(Math.atan2(fz, fx));
+    ctx.fillStyle = col; ctx.strokeStyle = "#000"; ctx.lineWidth = 1.5; ctx.globalAlpha = p.inPit ? .55 : 1;
+    ctx.beginPath(); ctx.moveTo(9, 0); ctx.lineTo(-6, 5.5); ctx.lineTo(-6, -5.5); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+    if (labels) { ctx.fillStyle = "#fff"; ctx.font = "bold 11px system-ui"; ctx.textAlign = "left"; ctx.fillText(d?.abbreviation ?? "?", x + 10, y - 8); }
+  }
+  $("#mapinfo").textContent = `${map.cars.size} coches · ${map.lastMsg ? Math.round(map.interval) + " ms" : "sin posiciones (¿sesión en GRID/RUNNING?)"}`;
+}
+requestAnimationFrame(drawMap);
+let drag = null;
+cv.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY, vx: map.view.x, vy: map.view.y }; cv.setPointerCapture(e.pointerId); cv.style.cursor = "grabbing"; });
+cv.addEventListener("pointermove", e => { if (drag) { map.view.x = drag.vx + e.clientX - drag.x; map.view.y = drag.vy + e.clientY - drag.y; } });
+cv.addEventListener("pointerup", () => { drag = null; cv.style.cursor = "grab"; });
+cv.addEventListener("wheel", e => {
+  e.preventDefault();
+  const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top, f = e.deltaY < 0 ? 1.15 : 1 / 1.15, v = map.view;
+  v.x = mx - (mx - v.x) * f; v.y = my - (my - v.y) * f; v.k *= f;
+}, { passive: false });
+
+/* ---------- init ---------- */
+$("#host").value = store.get("f1.host", location.hostname && location.protocol !== "file:" ? location.hostname : "localhost");
+$("#port").value = store.get("f1.port", "8765"); $("#tls").checked = !!store.get("f1.tls", "");
+applyScope(); renderAll(); resizeMap();
+/* Optional: index.html#host=localhost&port=8765&token=XYZ connects straight away; the hash is cleared afterwards. */
+{
+  const q = new URLSearchParams(location.hash.slice(1));
+  if (q.get("token")) {
+    if (q.get("host")) $("#host").value = q.get("host");
+    if (q.get("port")) $("#port").value = q.get("port");
+    $("#token").value = q.get("token");
+    history.replaceState(null, "", location.pathname + location.search);
+    $("#conn").requestSubmit();
+  }
+}
+</script>
+</body>
+</html>
