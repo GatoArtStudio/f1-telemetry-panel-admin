@@ -287,6 +287,10 @@ function connect(ev) {
   const host = $("#host").value.trim(), port = $("#port").value.trim(), token = $("#token").value.trim();
   if (!host || !token) return toast("Falta el host o el token", true);
   store.set("f1.host", host); store.set("f1.port", port); store.set("f1.tls", $("#tls").checked ? "1" : "");
+  if (location.protocol === "https:" && !$("#tls").checked) {
+    $("#tls").checked = true;
+    return toast("Esta página es https: el navegador bloquea ws:// (contenido mixto). Se ha marcado wss; el servidor necesita un proxy con TLS. Tu token no se ha gastado.", true);
+  }
   const url = `${$("#tls").checked ? "wss" : "ws"}://${host}${port ? ":" + port : ""}/?token=${encodeURIComponent(token)}`;
   setStatus("conectando…");
   let opened = false;
@@ -300,8 +304,8 @@ function connect(ev) {
     pending.clear();
     $("#connect").disabled = false; $("#disconnect").disabled = true;
     setStatus("desconectado"); $("#scope").hidden = true; state.scope = null; applyScope();
-    log(opened ? "desconectado (el token era de un solo uso: genera otro para volver a entrar)" : "no se pudo conectar: token inválido o ya usado, o servidor inaccesible", !opened);
-    if (!opened) toast("No se pudo conectar. ¿Token nuevo? ¿Puerto abierto?", true);
+    log(opened ? "desconectado (el token era de un solo uso: genera otro para volver a entrar)" : "no se pudo conectar. Causas: token inválido, caducado o ya usado; servidor o puerto inaccesible desde aquí; o el proxy no reenvía el WebSocket (cabeceras Upgrade y la query ?token=). Mira la consola del navegador (F12).", !opened);
+    if (!opened) toast("No se pudo conectar (el navegador no da el motivo exacto). Mira la consola (F12).", true);
   };
   mine.onerror = () => {};
 }
